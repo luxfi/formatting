@@ -1,4 +1,4 @@
-# LLM.md - Hanzo Formatting
+# Hanzo Formatting
 
 ## Overview
 Go module: github.com/luxfi/formatting
