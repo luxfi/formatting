@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 
 	"github.com/luxfi/crypto/hash"
@@ -65,31 +66,55 @@ func (enc Encoding) valid() bool {
 	return false
 }
 
-func (enc Encoding) MarshalJSON() ([]byte, error) {
+// MarshalText and UnmarshalText are the encoding's written form, which is the
+// one it has always had: MarshalJSON writes this same word in quotes. It is
+// said here as well because a URL carries text and no JSON. A read served as a
+// GET asks for its encoding with ?encoding=json, and an encoding read as the
+// number its kind is left every such request on Hex, which is what zero is.
+func (enc Encoding) MarshalText() ([]byte, error) {
 	if !enc.valid() {
 		return nil, errInvalidEncoding
 	}
-	return []byte(`"` + enc.String() + `"`), nil
+	return []byte(enc.String()), nil
 }
 
-func (enc *Encoding) UnmarshalJSON(b []byte) error {
-	str := string(b)
-	if str == "null" {
-		return nil
-	}
-	switch strings.ToLower(str) {
-	case `"hex"`:
+func (enc *Encoding) UnmarshalText(text []byte) error {
+	switch strings.ToLower(string(text)) {
+	case "hex":
 		*enc = Hex
-	case `"hexnc"`:
+	case "hexnc":
 		*enc = HexNC
-	case `"hexc"`:
+	case "hexc":
 		*enc = HexC
-	case `"json"`:
+	case "json":
 		*enc = JSON
 	default:
 		return errInvalidEncoding
 	}
 	return nil
+}
+
+func (enc Encoding) MarshalJSON() ([]byte, error) {
+	text, err := enc.MarshalText()
+	if err != nil {
+		return nil, err
+	}
+	return []byte(`"` + string(text) + `"`), nil
+}
+
+// UnmarshalJSON reads the same word, quoted. The mapping is in UnmarshalText
+// and is not written a second time; null is JSON's spelling of an absent field,
+// which leaves the encoding as it was.
+func (enc *Encoding) UnmarshalJSON(b []byte) error {
+	str := string(b)
+	if str == "null" {
+		return nil
+	}
+	word, err := strconv.Unquote(str)
+	if err != nil {
+		return errInvalidEncoding
+	}
+	return enc.UnmarshalText([]byte(word))
 }
 
 // Encode [bytes] to a string using the given encoding format [bytes] may be
